@@ -1,15 +1,15 @@
-#CoPriNet
+# CoPriNet
 
 CoPriNet is a Graph Neural Network trained on pairs of molecule 2D graphs and catalogue prices. CoPriNet predictions
 can be used as a proxy score for compound availability.
 
-##Installation
+## Installation
 ```
 conda env create -f CoPriNet_env.yml 
 conda activate CoPriNet
 ```
 
-##Scoring molecules
+## Scoring molecules
 In order to execute CoPriNet you only need to prepare a csv file with your SMILES and execute the following command
 ```
 python -m pricePrediction.predict path/to/csvFile -o path/toResults 
@@ -24,8 +24,8 @@ For a complete description of the available options use:
 python -m pricePrediction.predict -h
 ```
 
-##Retraining the model
-###Preparing dataset
+## Retraining the model
+### Preparing dataset
 
 1) Split the Mcule catalogue file into train, test, and val .csv files and chunk them into smaller files.
    The raw Mcule catalogue file should contain, at least, the following columns:"Mcule ID,SMILES,price 1 (USD),amount 1 (mg),delivery time 1 (w.days),available amount 1 (mg)".
