@@ -4,6 +4,8 @@ CoPriNet is a Graph Neural Network trained on pairs of molecule 2D graphs and ca
 can be used as a proxy score for compound availability.
 
 ## Installation
+
+In order to install requirements, use conda to create an environment form the CoPriNet_env.yml file
 ```
 conda env create -f CoPriNet_env.yml 
 conda activate CoPriNet
