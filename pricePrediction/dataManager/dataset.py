@@ -1,17 +1,21 @@
+import operator
 import os
 import joblib
 import lmdb
 import numpy as np
+import torch
 
 from torch.utils.data import Dataset
 
+from pricePrediction import config
 from pricePrediction.preprocessData.serializeDatapoints import getExampleId, deserializeExample
 from pricePrediction.utils import search_buckedId, EncodedDirNamesAndTemplates
 
 
 class Dataset_graphPrice(Dataset):
     def __init__(self, encodedDir, datasetSplit, use_log_for_target=True, use_weights=False, buckets_fname=None,
-                 use_lds=False, do_undersample=False, augment_labels=False):
+                 use_lds=False, do_undersample=False, augment_labels=False, store_in_memory=config.DATASET_IN_MEMORY,
+                 normalize_node_feats=config.NORMALIZE_NODE_FEATS):
 
         self.use_log_for_target = use_log_for_target
         self.use_weights = use_weights
@@ -19,11 +23,22 @@ class Dataset_graphPrice(Dataset):
         self.use_lds = use_lds
         self.do_undersample = do_undersample
         self.augment_labels = augment_labels
+        self.store_in_memory = store_in_memory
+        self.normalize_node_feats = normalize_node_feats
+
+
         assert (self.buckets_fname is not None and self.use_weights) or not self.use_weights
         if self.do_undersample: raise NotImplementedError()
 
         dataNames = EncodedDirNamesAndTemplates(encodedDir)
         size_metadata_info = joblib.load( dataNames.DATASET_METADATA_FNAME_TEMPLATE % datasetSplit)
+
+        if self.normalize_node_feats:
+            self.min_x = torch.FloatTensor(size_metadata_info["feature_stats"]["min"])
+            self.max_x = torch.FloatTensor(size_metadata_info["feature_stats"]["max"])
+            self.range_x = self.max_x - self.min_x
+            assert not torch.isclose(self.range_x, torch.zeros(1)).any(), f"Error, range close to 0, {torch.where(torch.isclose(self.range_x, torch.zeros(1)))}"
+            assert not torch.isinf(self.range_x).any()
 
         self.total_size = size_metadata_info["total_size"]
         self.size_per_file = size_metadata_info["sizes_list"]
@@ -39,6 +54,8 @@ class Dataset_graphPrice(Dataset):
 
         self._bucket_ranges = None
         self._n_per_bucket = None
+        self._cache = {}
+
 
     def _idx_to_file_and_num(self, idx):
         fileIdx = search_buckedId(idx, self.last_cum_elemIdx_at_file)
@@ -101,33 +118,47 @@ class Dataset_graphPrice(Dataset):
         # dataset = dataset.select(predicate)
         raise NotImplementedError() #This code is obsolete and requires refactoring
 
+    def normalize_x(self, x):
+        return (x-self.min_x)/self.range_x
+
     def __getitem__(self, index):
-        if index >= self.total_size:
-            raise IndexError()
-        fileIdx, pointIdx = self._idx_to_file_and_num(index)
-        db_manager = self.db_managers[fileIdx]
-        if db_manager is None:
-            txn= self._init_db(fileIdx)[-1]
+
+        out = self._cache.get(index, None)
+        if out is not None:
+            return out
         else:
-            txn = db_manager[-1]
+            if index >= self.total_size:
+                raise IndexError()
+            fileIdx, pointIdx = self._idx_to_file_and_num(index)
+            db_manager = self.db_managers[fileIdx]
+            if db_manager is None:
+                txn= self._init_db(fileIdx)[-1]
+            else:
+                txn = db_manager[-1]
 
-        dataBytes = txn.get(getExampleId(self.fileIdx_to_fileBasename[fileIdx], pointIdx))
-        if dataBytes is None:
-            msg = "Error:\n%s %s   %s   %s"%(index, fileIdx, pointIdx, getExampleId(self.fileIdx_to_fileBasename[fileIdx], pointIdx))
-            raise Exception(msg)
-        graph, label = deserializeExample(dataBytes)
-        if self.use_log_for_target:
-            label = np.log(label)
+            dataBytes = txn.get(getExampleId(self.fileIdx_to_fileBasename[fileIdx], pointIdx))
+            if dataBytes is None:
+                msg = "Error:\n%s %s   %s   %s"%(index, fileIdx, pointIdx, getExampleId(self.fileIdx_to_fileBasename[fileIdx], pointIdx))
+                raise Exception(msg)
+            graph, label = deserializeExample(dataBytes)
 
-        if self.augment_labels:
-            label = label * (1+0.05*np.random.rand()-0.025)
+            if self.normalize_node_feats:
+                graph.x = self.normalize_x(graph.x)
 
-        if self.use_weights:
-            graph.w = self.compute_weight(label)
-        else:
-            graph.w = 1
-        graph.y = label
-        return graph, label
+            if self.use_log_for_target:
+                label = np.log(label)
+
+            if self.augment_labels:
+                label = label * (1+0.05*np.random.rand()-0.025)
+
+            if self.use_weights:
+                graph.w = self.compute_weight(label)
+            else:
+                graph.w = 1
+            graph.y = label
+            if self.store_in_memory:
+                self._cache[index] = (graph, label)
+            return graph, label
 
     def __len__(self):
         return self.total_size
@@ -137,3 +168,4 @@ class Dataset_graphPrice(Dataset):
             if db_handler:
                 env, txn = db_handler
                 env.close()
+

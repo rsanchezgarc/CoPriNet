@@ -148,8 +148,8 @@ def test(smi = "C1=CC=C(C=C1)CC(C(=O)O)N"):
     print(graph.keys)
     print(graph.x)
     print(graph.edge_index)
-    print( graph.edges_attr )
-    print( graph.x.shape, graph.edge_index.shape, graph.edges_attr.shape)
+    print( graph.edge_attr )
+    print( graph.x.shape, graph.edge_index.shape, graph.edge_attr.shape)
     for idx in range(mol.GetNumAtoms()):
         mol.GetAtomWithIdx(idx).SetProp('molAtomMapNumber', str(mol.GetAtomWithIdx(idx).GetIdx()))
     from matplotlib import pyplot as plt; from rdkit.Chem import Draw; plt.imshow(Draw.MolsToGridImage([mol], molsPerRow=2)); plt.show()

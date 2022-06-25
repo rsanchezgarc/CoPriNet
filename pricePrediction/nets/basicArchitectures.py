@@ -94,6 +94,43 @@ class GNN_PNAConv(torch.nn.Module):
 
         return self.mlp(x)
 
+
+class QdolarAR(torch.nn.Module):
+    def __init__(self,
+                 nodes_n_features: int,
+                 *args, **kargs
+        ):
+        super(QdolarAR, self).__init__()
+
+        n_layers: int = 5
+        hidden_size_node: int = nodes_n_features
+        fcc_hidden_size: int = 100
+        dropout: float = 0.28
+
+        self.fcc_hidden_size = fcc_hidden_size
+        self.dropout = dropout
+        self.n_layers = n_layers
+        self.hidden_size_node = hidden_size_node
+
+        assert n_layers >=3
+        fc_layers = [
+                BatchNorm(hidden_size_node),
+                Linear( hidden_size_node, fcc_hidden_size), BatchNorm(fcc_hidden_size), ReLU(),
+        ]
+        for i in range(n_layers-2):
+            fc_layers += [
+                Linear(fcc_hidden_size, fcc_hidden_size), BatchNorm(fcc_hidden_size), ReLU(),
+            ]
+        if dropout>0:
+            fc_layers += [ Dropout(p=dropout) ]
+
+        self.mlp = Sequential( *fc_layers )
+
+    def forward(self, x, edge_index, edge_attr, batch):
+        assert len(batch) == len(batch.unique())
+        assert not torch.isnan(x).any(), "Error, x contains nan"
+        return self.mlp(x)
+
 class GNN_AttentiveFP(torch.nn.Module):
     def __init__(self,
         nodes_n_features: int,
