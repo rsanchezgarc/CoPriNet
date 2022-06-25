@@ -106,7 +106,7 @@ class InferencePlotter():
 
             # fig = plt.figure(**figArgs)
             # plt.boxplot( abs(y_preds - ys)/ys )
-            # name = label + "_relative_error_boxplot"
+            # name = method_name + "_relative_error_boxplot"
             # plt.title(name)
             # img_arr = plt_to_numpy(fig)
             # if tensorboard_wrapper:

@@ -2,6 +2,7 @@ import os, sys
 import dask.dataframe as dd
 from argparse import ArgumentParser
 
+from pricePrediction.config import TEST_SIZE
 from pricePrediction.selectFromRawData.selectFromRawDataNonVirtualAll_base import RawDataSelector
 import pandas as pd
 from pricePrediction import config
@@ -12,13 +13,16 @@ class SelectFromRawDataOnlyVirtualAll(RawDataSelector):
              os.path.join(config.RAW_DATA_DIRNAME, "mcule_purchasable_full_prices_210319_kLp4Zt_march.csv.gz"),
              bb_fname: str = config.BUILDING_BLOCKS_FNAME,
              computed_datadir: str = config.DATASET_DIRNAME,
-             max_size:int=10000000):
+             max_size:int=10000000,
+             test_size:int=TEST_SIZE, nrows:int=None):
         '''
         :param str full_dataset_fname: The fname for the whole Mcule csv file (csv.gz)
         :param str bb_fname: The fname for the building blocks csv file (csv.gz)
         :param str computed_datadir: The directory where the selected records will be saved
+        :param int test_size: The number of entries to include in the test set
+        :param int nrows: The number of rows to process in the full_dataset_fname. If None, process all rows
         '''
-        super().__init__(full_dataset_fname, bb_fname, computed_datadir)
+        super().__init__(full_dataset_fname, bb_fname, computed_datadir,test_size=test_size,nrows=nrows)
         self.max_size = max_size
 
     def read_csv(self, csv_name):
