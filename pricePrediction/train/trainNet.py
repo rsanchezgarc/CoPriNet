@@ -6,11 +6,12 @@ import sys, os
 # torch.multiprocessing.set_sharing_strategy('file_system')
 
 from pytorch_lightning import seed_everything
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, StochasticWeightAveraging
 import pytorch_lightning as pl
 
 from pytorch_lightning.plugins import DDPPlugin
 
+from pricePrediction import config
 from pricePrediction.ArgParser_base import MyArgParser
 from pricePrediction.dataManager.dataManager import GraphPriceDatamodule
 from pricePrediction.evaluation.evaluation import PlotFigsTensorboardCallback, InferencePlotter
@@ -26,12 +27,15 @@ def parse_args():
     parser.add_argument("-r", "--restore", type=str, help="Directory to trained checkpoint to continue training", default=None)
     parser.add_argument("-c", "--config", type=str, help="Path to json file with the config arguments to create/update the "
                                                          "model")
+    parser.add_argument("-o", "--default_root_dir", type=str, help="The directory where to save "
+                                                                          "checkpoints and logs", default=None)
     parser.add_argument("-g", "--gpus", type=int, help="Number of gpus to use", default=1)
     parser.add_argument("-n", "--num_nodes", type=int, help="Number of nodes to use", default=None)
     parser.add_argument("-s", "--random_seed", type=int, help="Random seed", default=121)
 
     parser.add_argument( "--limit_train_batches", type=float, help="Train only with a fraction of the tranining set", default=None)
-
+    parser.add_argument("--swa", action="store_true", default=False,
+                                help="Perform  Stochastic Weight Averaging")
     #### Model and data args ####
 
     group = parser.add_argument_group(title="data")
@@ -86,21 +90,28 @@ if __name__ == "__main__":
         nodes_degree = dataModule.get_nodes_degree()
         args["model"].update( dict(
                             nodes_n_features=nodes_n_features, edges_n_features=edges_n_features,
-                            deg=nodes_degree, data_hparams= args["data"])
+                            deg=nodes_degree, data_hparams= args["data"], logs_only_in_epoch= args["main"].get("gpus", 0) > 1)
                                    )
 
         pl_model = PricePredictorModule( **args["model"] )
 
     print( pl_model.hparams )
 
-    default_root_dir = os.getcwd()
+    callbacks = [
+        EarlyStopping(monitor='val_loss', patience=60),
+        ModelCheckpoint(monitor='val_loss', verbose=True),
+        PlotFigsTensorboardCallback(frequency=5, save_csv=True)
+    ]
+
+    if args["main"].get("swa", False):
+        callbacks += [
+            StochasticWeightAveraging(annealing_epochs=config.COSINE_LR_SCHEDULE_N_EPOCHS, swa_lrs= pl_model.hparams.lr)
+        ]
+
+    default_root_dir = args['main'].get('default_root_dir', os.getcwd())
     trainer_args = dict(gpus=1, max_epochs=args['main']["n_epochs"], progress_bar_refresh_rate=20,
                         default_root_dir=default_root_dir, auto_lr_find=True,
-              callbacks = [
-                       EarlyStopping(monitor='val_loss', patience=60),
-                       ModelCheckpoint(monitor='val_loss', verbose=True),
-                       PlotFigsTensorboardCallback(frequency=5, save_csv=True)
-                           ])
+                        callbacks = callbacks)
     if args["main"]["limit_train_batches"]:
         trainer_args["limit_train_batches"] = args["main"]["limit_train_batches"]
 
