@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 
 from pricePrediction import config
 from pricePrediction.ArgParser_base import ArgParseable
+from pricePrediction.config import USE_FEATURES_NET
 from pricePrediction.nets.FDS_imbalance import FDS
 
 
@@ -38,6 +39,7 @@ class PricePredictorModule(pl.LightningModule, ArgParseable):
         b2: float = 0.999,
         weight_decay=1e-8,
         data_hparams =None,
+        logs_only_in_epoch = False
     ):
 
 
@@ -73,12 +75,16 @@ class PricePredictorModule(pl.LightningModule, ArgParseable):
             deg = deg.clone().detach()
         self.hparams.deg = deg
 
+
+
         if gnn_class == "GNN_PNAConv":
-            from pricePrediction.nets.basicArchitectures import GNN_PNAConv
-            GNN = GNN_PNAConv
+            from pricePrediction.nets.basicArchitectures import GNN_PNAConv as GNN
         elif gnn_class == "GNN_AttentiveFP":
-            from pricePrediction.nets.basicArchitectures import GNN_AttentiveFP
-            GNN = GNN_AttentiveFP
+            from pricePrediction.nets.basicArchitectures import GNN_AttentiveFP  as GNN
+        elif gnn_class == "QdolarAR":
+            assert USE_FEATURES_NET
+            from pricePrediction.nets.basicArchitectures import QdolarAR as GNN
+
         else:
             raise ValueError("Error, gnn_class not supported")
 
@@ -100,6 +106,12 @@ class PricePredictorModule(pl.LightningModule, ArgParseable):
             self.trainLossF = F.smooth_l1_loss
         else:
             raise ValueError("Loss option not recognized")
+
+        if logs_only_in_epoch: #TODO: check if this prevents multi-gpu hang
+            self.logs_kwargs = dict(on_step=False, on_epoch=True, sync_dist=True)
+        else:
+            self.logs_kwargs = dict(on_step=True, on_epoch=False, sync_dist=False)
+
 
     def compute_training_loss(self, y_pred, y, w=None):
         loss = self.trainLossF(y_pred, y, reduction='none')
@@ -132,8 +144,8 @@ class PricePredictorModule(pl.LightningModule, ArgParseable):
 
         loss_l1 = F.l1_loss(y_pred, graphs.y)
 
-        self.log('loss', loss)
-        self.log('loss_l1', loss_l1, prog_bar=True)
+        self.log('loss', loss, **self.logs_kwargs)
+        self.log('loss_l1', loss_l1, prog_bar=True, **self.logs_kwargs)
 
         tqdm_dict = {'loss': loss.detach()}
         output = OrderedDict({
@@ -184,7 +196,8 @@ class PricePredictorModule(pl.LightningModule, ArgParseable):
         b1 = self.hparams.b1
         b2 = self.hparams.b2
 
-        opt = torch.optim.Adam(self.net.parameters(), lr=lr, betas=(b1, b2), weight_decay=self.hparams.weight_decay)
+        opt = torch.optim.Adam(self.parameters(), lr=lr, betas=(b1, b2), weight_decay=self.hparams.weight_decay)
+
         # for param_group in opt.param_groups:
         #     print(param_group["lr"])
 
@@ -198,15 +211,21 @@ class PricePredictorModule(pl.LightningModule, ArgParseable):
         return conf
 
 if __name__ == "__main__":
-    from pricePrediction.preprocessData.smilesToGraph import smiles_to_graph
     from torch_geometric.data import Batch
 
     degree =[0, 41130, 117278, 70152, 3104]
 
+    gnn_class = "QdolarAR" #"GNN_PNAConv"# "GNN_AttentiveFP"
+
+    if gnn_class != "QdolarAR":
+        from pricePrediction.preprocessData.smilesToGraph import smiles_to_graph
+    else:
+        from pricePrediction.preprocessData.smilesToDescriptors import smiles_to_graph
+
     g = smiles_to_graph("CCCCCCCCCCC")
     nodes_n_features = g.x.shape[1]
     edges_n_features = g.edge_attr.shape[1]
-    gnn_class = "GNN_PNAConv"# "GNN_AttentiveFP"
+
     net = PricePredictorModule(nodes_n_features=nodes_n_features, edges_n_features=edges_n_features,
                                deg=degree, lr=1e-3, gnn_class=gnn_class)
 

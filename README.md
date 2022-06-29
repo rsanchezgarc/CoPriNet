@@ -77,7 +77,7 @@ file should contain the header `SMILES,price` and the prices should be in $/g.
 
 3) Train the network
   ```
-python -m pricePrediction.train.trainNet -m "one messege to store" --encodedDir /path/to/save/prepared/data
+python -m pricePrediction.train.trainNet -m "one messege to describe the training" --encodedDir /path/to/save/prepared/data
   
   e.g.
 python -m pricePrediction.train.trainNet -m "trial01" --encodedDir ./dataset_encoded/ 
