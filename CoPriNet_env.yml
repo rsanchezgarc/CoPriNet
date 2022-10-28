@@ -1,4 +1,4 @@
-name: coprinet2
+name: CoPriNet
 channels:
   - rdkit
   - pytorch
