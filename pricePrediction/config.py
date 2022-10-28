@@ -41,8 +41,8 @@ ENCODED_DIR = os.path.join(DATASET_DIRNAME, "encoded")
 
 RAW_DATA_FILE_SUFFIX = r"mcule_full_(train|test|val)\.csv_split_\w+\.csv$"
 
-DEFAULT_MODEL = os.path.join( DATA_DIR, "data/models/final_inStock/lightning_logs/version_0/checkpoints/epoch=238-step=1295857.ckpt")
-# DEFAULT_MODEL = os.path.join( DATA_DIR, "data/models/final_virtual/lightning_logs/version_0/checkpoints/epoch=172-step=3231639.ckpt")
+DEFAULT_MODEL = os.path.join( DATA_DIR, "data/models/trained_inStock/lightning_logs/version_0/checkpoints/epoch=238-step=1295857.ckpt")
+# DEFAULT_MODEL = os.path.join( DATA_DIR, "data/models/trained_virtual/lightning_logs/version_0/checkpoints/epoch=172-step=3231639.ckpt")
 
 
 ######################### Ignore the next lines if not running a comparison ################
