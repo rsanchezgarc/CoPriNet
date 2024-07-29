@@ -1,6 +1,6 @@
 # CoPriNet
 
-CoPriNet is a Graph Neural Network trained on pairs of molecule 2D graphs and catalogue prices. CoPriNet predictions
+[CoPriNet](https://pubs.rsc.org/en/content/articlelanding/2023/dd/d2dd00071g) is a Graph Neural Network trained on pairs of molecule 2D graphs and catalogue prices. CoPriNet predictions
 can be used as a proxy score for compound availability.
 
 ## Installation
@@ -27,7 +27,10 @@ python -m pricePrediction.predict -h
 ```
 
 ## Retraining the model
-### Preparing dataset
+
+### Preparing dataset 
+
+If you are using your own dataset, and not the Mcule catalogue, go to step 2
 
 1) Split the Mcule catalogue file into train, test, and val .csv files and chunk them into smaller files.
    The raw Mcule catalogue file should contain, at least, the following columns:"Mcule ID,SMILES,price 1 (USD),amount 1 (mg),delivery time 1 (w.days),available amount 1 (mg)".
@@ -57,12 +60,13 @@ Chunked files contain two columns, "SMILES,price" and will be named following th
 ```
 RAW_DATA_FILE_SUFFIX = r"mcule_full_(train|test|val)\.csv_split_\w+\.csv$"
 ```
+
 The file pattern can be edited changing the `pricePrediction/config.py` file. If you are using your own catalogue
-you may want to split it manually into tran/test/validation and chunk the partitions into into smaller files. Each chunked
+you may want to split it manually into tran/test/validation and chunk the partitions into smaller files. Each chunked
 file should contain the header `SMILES,price` and the prices should be in $/g.
 
 2) Create the dataset from the chunked .csv files that follow the pattern in the variable `pricePrediction.config.RAW_DATA_FILE_SUFFIX`
-   The files should be csv files with two columns named SMILES,price
+   The files should be csv files with two columns named SMILES,price. price should be in $/g.
 
 - Using the default paths included in `pricePrediction/config.py`:
     ```
